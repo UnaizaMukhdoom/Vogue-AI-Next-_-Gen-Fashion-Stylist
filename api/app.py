@@ -10,6 +10,7 @@ from PIL import Image
 import io
 import base64
 import json
+from scraper import scrape_all_brands_by_skin_tone
 
 app = Flask(__name__)
 CORS(app)  # Allow Flutter app to call this API
@@ -361,7 +362,8 @@ def home():
         "version": "1.0",
         "endpoints": {
             "/analyze": "POST - Upload image for analysis",
-            "/health": "GET - Health check"
+            "/health": "GET - Health check",
+            "/scrape-clothes": "POST - Scrape clothes based on skin tone"
         }
     })
 
@@ -414,6 +416,93 @@ def analyze():
             "error": f"Server error: {str(e)}"
         }), 500
 
+@app.route('/scrape-clothes', methods=['POST'])
+def scrape_clothes():
+    """
+    Scrape clothing items based on skin tone analysis
+    Expects JSON: {
+        "skin_tone": "Fair",
+        "best_colors": ["Coral", "Turquoise"],
+        "undertone": "Warm",
+        "max_items": 20  # optional
+    }
+    """
+    try:
+        data = request.json
+        if not data:
+            return jsonify({
+                "success": False,
+                "error": "No data provided"
+            }), 400
+        
+        skin_tone = data.get('skin_tone', 'Medium')
+        best_colors = data.get('best_colors', [])
+        undertone = data.get('undertone', 'Neutral')
+        max_items = data.get('max_items', 20)
+        
+        # Get color recommendations from existing function
+        recommendations = get_color_recommendations(skin_tone)
+        
+        # Combine API recommendations with user's best colors
+        all_colors = list(set(recommendations['best_colors'] + best_colors))
+        
+        # Scrape clothes from all brands
+        print(f"Scraping clothes for skin tone: {skin_tone}, colors: {all_colors}")
+        print(f"Max items requested: {max_items}")
+        
+        # Limit scraping to avoid timeout
+        max_per_brand = min(max_items // 5, 5)  # Max 5 items per brand
+        
+        clothing_items = scrape_all_brands_by_skin_tone(
+            skin_tone_category=skin_tone,
+            preferred_colors=all_colors,
+            max_per_brand=max_per_brand
+        )
+        
+        # If no items found, return empty list with helpful message
+        if not clothing_items:
+            print("No items scraped. This might be due to website structure changes or blocking.")
+            return jsonify({
+                'success': True,
+                'skin_tone': skin_tone,
+                'undertone': undertone,
+                'recommended_colors': all_colors,
+                'clothing_items': [],
+                'total_items': 0,
+                'brands_scraped': [],
+                'message': 'No items found. Try again later or check your internet connection.'
+            })
+        
+        # Format response
+        formatted_items = []
+        for idx, item in enumerate(clothing_items[:max_items]):
+            formatted_items.append({
+                'id': item.get('url', '').split('/')[-1] or f"item_{idx}",
+                'brand': item.get('brand', 'Unknown'),
+                'title': item.get('title', 'Untitled'),
+                'color': item.get('color', 'Unknown'),
+                'price': item.get('price', 'N/A'),
+                'url': item.get('url', ''),
+                'image_url': item.get('image', ''),
+            })
+        
+        return jsonify({
+            'success': True,
+            'skin_tone': skin_tone,
+            'undertone': undertone,
+            'recommended_colors': all_colors,
+            'clothing_items': formatted_items,
+            'total_items': len(formatted_items),
+            'brands_scraped': list(set(item['brand'] for item in formatted_items))
+        })
+        
+    except Exception as e:
+        print(f"Error in scrape_clothes: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 # ============================================================================
 # RUN SERVER
 # ============================================================================
@@ -421,4 +510,7 @@ def analyze():
 if __name__ == '__main__':
     # For local testing
     app.run(host='0.0.0.0', port=5000, debug=True)
+else:
+    # For Vercel serverless deployment
+    handler = app
 

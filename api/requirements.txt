@@ -3,5 +3,9 @@ flask-cors==4.0.1
 opencv-python-headless==4.10.0.84
 numpy==1.26.4
 Pillow==10.4.0
-gunicorn==23.0.0
+# gunicorn removed - not needed for Vercel serverless
+# Web scraping dependencies
+beautifulsoup4==4.12.2
+requests==2.31.0
+# lxml==4.9.3  # Optional - using html.parser instead (works on Windows without compilation)
 
