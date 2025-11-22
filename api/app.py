@@ -10,7 +10,13 @@ from PIL import Image
 import io
 import base64
 import json
-from scraper import scrape_all_brands_by_skin_tone
+
+# Optional scraper import - only import when needed
+try:
+    from scraper import scrape_all_brands_by_skin_tone
+except ImportError:
+    scrape_all_brands_by_skin_tone = None
+    print("Warning: scraper module not available")
 
 app = Flask(__name__)
 CORS(app)  # Allow Flutter app to call this API
@@ -450,6 +456,13 @@ def scrape_clothes():
         print(f"Scraping clothes for skin tone: {skin_tone}, colors: {all_colors}")
         print(f"Max items requested: {max_items}")
         
+        # Check if scraper is available
+        if scrape_all_brands_by_skin_tone is None:
+            return jsonify({
+                'success': False,
+                'error': 'Scraper module not available. Please check server configuration.'
+            }), 503
+        
         # Limit scraping to avoid timeout
         max_per_brand = min(max_items // 5, 5)  # Max 5 items per brand
         
@@ -507,10 +520,10 @@ def scrape_clothes():
 # RUN SERVER
 # ============================================================================
 
+# For Vercel serverless deployment - must be at module level
+handler = app
+
 if __name__ == '__main__':
     # For local testing
     app.run(host='0.0.0.0', port=5000, debug=True)
-else:
-    # For Vercel serverless deployment
-    handler = app
 
