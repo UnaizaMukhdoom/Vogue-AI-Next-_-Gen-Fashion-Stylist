@@ -4,12 +4,10 @@ import 'dart:convert';
 
 /// Service for calling the Skin Tone Analysis API
 class SkinAnalysisService {
-  // Local API - Replace with deployed URL when ready
-  // For Android Emulator: use 'http://10.0.2.2:5000'
-  // For Physical Device: use your computer's IP (e.g., 'http://192.168.1.4:5000')
-  // For iOS Simulator: use 'http://localhost:5000'
-  // Updated to match your Flask server IP address
-  static const String baseUrl = 'http://192.168.1.4:5000'; // Your computer's IP address
+  // Production API - Deployed on Railway
+  // Production URL: https://amiable-encouragement-production.up.railway.app
+  // For local development, use: 'http://localhost:5000' or your computer's IP
+  static const String baseUrl = 'https://amiable-encouragement-production.up.railway.app';
   
   /// Analyze an image and get skin tone, hair, eye color analysis
   static Future<AnalysisResult> analyzeImage(String imagePath) async {
@@ -48,6 +46,38 @@ class SkinAnalysisService {
       return response.statusCode == 200;
     } catch (e) {
       return false;
+    }
+  }
+
+  /// Scrape clothes based on skin tone analysis
+  /// Returns a list of clothing items from various brands
+  static Future<Map<String, dynamic>> scrapeClothes({
+    required String skinTone,
+    required List<String> bestColors,
+    required String undertone,
+    int maxItems = 20,
+  }) async {
+    try {
+      final uri = Uri.parse('$baseUrl/scrape-clothes');
+      final response = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'skin_tone': skinTone,
+          'best_colors': bestColors,
+          'undertone': undertone,
+          'max_items': maxItems,
+        }),
+      ).timeout(const Duration(seconds: 60));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body) as Map<String, dynamic>;
+        return data;
+      } else {
+        throw Exception('Server error: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Failed to scrape clothes: $e');
     }
   }
 }
