@@ -11,12 +11,19 @@ import io
 import base64
 import json
 
-# Optional scraper import - only import when needed
+# Import scraper - required for /scrape-clothes endpoint
 try:
     from scraper import scrape_all_brands_by_skin_tone
-except ImportError:
+    SCRAPER_AVAILABLE = True
+    print("✓ Scraper module loaded successfully")
+except ImportError as e:
     scrape_all_brands_by_skin_tone = None
-    print("Warning: scraper module not available")
+    SCRAPER_AVAILABLE = False
+    print(f"⚠ Warning: scraper module not available: {e}")
+except Exception as e:
+    scrape_all_brands_by_skin_tone = None
+    SCRAPER_AVAILABLE = False
+    print(f"⚠ Warning: error loading scraper module: {e}")
 
 app = Flask(__name__)
 CORS(app)  # Allow Flutter app to call this API
@@ -457,10 +464,11 @@ def scrape_clothes():
         print(f"Max items requested: {max_items}")
         
         # Check if scraper is available
-        if scrape_all_brands_by_skin_tone is None:
+        if not SCRAPER_AVAILABLE or scrape_all_brands_by_skin_tone is None:
             return jsonify({
                 'success': False,
-                'error': 'Scraper module not available. Please check server configuration.'
+                'error': 'Scraper module not available. Please check server configuration and ensure scraper.py is present.',
+                'details': 'The scraper module failed to load. Check Railway logs for more information.'
             }), 503
         
         # Limit scraping to avoid timeout
