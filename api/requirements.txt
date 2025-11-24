@@ -8,8 +8,12 @@ gunicorn==21.2.0
 beautifulsoup4==4.12.2
 requests==2.31.0
 # lxml==4.9.3  # Optional - using html.parser instead (works on Windows without compilation)
-# Chatbot dependencies
+# Build tools - help with package installation
+setuptools>=65.0.0
+wheel>=0.38.0
+# Chatbot dependencies - exact versions for Railway compatibility
+# scipy is required by scikit-learn, installing explicitly helps
+scipy==1.11.4
 scikit-learn==1.3.2
 joblib==1.3.2
 pandas==2.1.4
-

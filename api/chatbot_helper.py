@@ -4,12 +4,23 @@
 
 import os
 import pickle
-import joblib
-import pandas as pd
 import re
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.naive_bayes import MultinomialNB
 import numpy as np
+
+# Try to import chatbot dependencies - gracefully handle if not available
+try:
+    import joblib
+    import pandas as pd
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    from sklearn.naive_bayes import MultinomialNB
+    SKLEARN_AVAILABLE = True
+except ImportError as e:
+    joblib = None
+    pd = None
+    TfidfVectorizer = None
+    MultinomialNB = None
+    SKLEARN_AVAILABLE = False
+    print(f"⚠ Warning: scikit-learn dependencies not available: {e}")
 
 # Global variables for lazy loading
 _chatbot_model = None
@@ -26,6 +37,11 @@ def load_chatbot_model():
     
     if _chatbot_loaded:
         return _chatbot_model, _chatbot_vectorizer
+    
+    if not SKLEARN_AVAILABLE:
+        print("⚠ scikit-learn not available - chatbot will use fallback mode")
+        _chatbot_loaded = True
+        return None, None
     
     try:
         # Try to load model files (adjust paths based on your actual model files)
@@ -57,26 +73,27 @@ def load_chatbot_model():
                 break
         
         # Load responses from dataset if available
-        dataset_paths = [
-            'fashion_dataset_balanced.csv',
-            'fashion_dataset_language_fixed.csv',
-            'fashion_dataset_with_indices.csv'
-        ]
-        
-        for path in dataset_paths:
-            if os.path.exists(path):
-                try:
-                    df = pd.read_csv(path)
-                    # Extract responses based on your dataset structure
-                    # This is a placeholder - adjust based on your actual dataset
-                    if 'Response' in df.columns:
-                        _chatbot_responses = df.set_index('Intent')['Response'].to_dict()
-                    elif 'response' in df.columns:
-                        _chatbot_responses = df.set_index('intent')['response'].to_dict()
-                    print(f"✓ Chatbot responses loaded from {path}")
-                    break
-                except Exception as e:
-                    print(f"⚠ Could not load responses from {path}: {e}")
+        if pd is not None:
+            dataset_paths = [
+                'fashion_dataset_balanced.csv',
+                'fashion_dataset_language_fixed.csv',
+                'fashion_dataset_with_indices.csv'
+            ]
+            
+            for path in dataset_paths:
+                if os.path.exists(path):
+                    try:
+                        df = pd.read_csv(path)
+                        # Extract responses based on your dataset structure
+                        # This is a placeholder - adjust based on your actual dataset
+                        if 'Response' in df.columns:
+                            _chatbot_responses = df.set_index('Intent')['Response'].to_dict()
+                        elif 'response' in df.columns:
+                            _chatbot_responses = df.set_index('intent')['response'].to_dict()
+                        print(f"✓ Chatbot responses loaded from {path}")
+                        break
+                    except Exception as e:
+                        print(f"⚠ Could not load responses from {path}: {e}")
         
         _chatbot_loaded = True
         
@@ -204,6 +221,8 @@ def get_fallback_response(user_message, context):
 
 def is_chatbot_available():
     """Check if chatbot model is loaded and available"""
+    if not SKLEARN_AVAILABLE:
+        return False
     model, vectorizer = load_chatbot_model()
     return model is not None and vectorizer is not None
 
