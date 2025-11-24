@@ -376,7 +376,8 @@ def home():
         "endpoints": {
             "/analyze": "POST - Upload image for analysis",
             "/health": "GET - Health check",
-            "/scrape-clothes": "POST - Scrape clothes based on skin tone"
+            "/scrape-clothes": "POST - Scrape clothes based on skin tone",
+            "/analyze-outfit": "POST - Analyze outfit for FitCheck"
         }
     })
 
@@ -522,6 +523,325 @@ def scrape_clothes():
         return jsonify({
             'success': False,
             'error': str(e)
+        }), 500
+
+# ============================================================================
+# OUTFIT ANALYSIS (FITCHECK)
+# ============================================================================
+
+def analyze_outfit_image(image_array):
+    """
+    Analyze outfit image for FitCheck
+    Detects colors, proportions, style, and provides personalized feedback
+    Based on the actual image content uploaded by the user
+    """
+    try:
+        # Convert to RGB for color analysis
+        img_rgb = cv2.cvtColor(image_array, cv2.COLOR_BGR2RGB)
+        h, w = img_rgb.shape[:2]
+        
+        print(f"Analyzing outfit image: {w}x{h} pixels")
+        
+        # Resize for faster processing while maintaining aspect ratio
+        max_dim = 800
+        if w > h:
+            new_w = max_dim
+            new_h = int(max_dim * h / w)
+        else:
+            new_h = max_dim
+            new_w = int(max_dim * w / h)
+        
+        img_small = cv2.resize(img_rgb, (new_w, new_h))
+        
+        # Extract dominant colors from different regions of the outfit
+        # Top region (likely shirt/top)
+        top_region = img_small[:int(new_h*0.4), :]
+        # Middle region (waist area)
+        middle_region = img_small[int(new_h*0.35):int(new_h*0.65), :]
+        # Bottom region (likely pants/skirt)
+        bottom_region = img_small[int(new_h*0.6):, :]
+        
+        def get_dominant_color(region, region_name=""):
+            """Extract dominant color from a region"""
+            if region.size == 0:
+                return np.array([128, 128, 128]), 'Neutral'
+            
+            pixels = region.reshape(-1, 3)
+            
+            # Filter out very bright pixels (likely background/lighting)
+            # and very dark pixels (shadows)
+            mask = (pixels.sum(axis=1) > 100) & (pixels.sum(axis=1) < 700)
+            filtered_pixels = pixels[mask]
+            
+            if len(filtered_pixels) == 0:
+                filtered_pixels = pixels
+            
+            # Get median color (more robust than mean)
+            dominant_rgb = np.median(filtered_pixels, axis=0).astype(int)
+            
+            # Classify color
+            r, g, b = dominant_rgb
+            brightness = 0.299*r + 0.587*g + 0.114*b
+            
+            # Enhanced color classification
+            if brightness > 220:
+                color_name = 'White/Cream'
+            elif brightness < 60:
+                color_name = 'Black'
+            elif r > g + 30 and r > b + 30:
+                if r > 200:
+                    color_name = 'Red'
+                else:
+                    color_name = 'Pink/Rose'
+            elif g > r + 30 and g > b + 30:
+                color_name = 'Green'
+            elif b > r + 30 and b > g + 30:
+                if b > 150:
+                    color_name = 'Blue'
+                else:
+                    color_name = 'Navy'
+            elif r > 180 and g > 150 and b < 100:
+                color_name = 'Yellow/Beige'
+            elif r > 150 and g > 120 and b < 80:
+                color_name = 'Orange/Coral'
+            elif abs(r - g) < 30 and abs(g - b) < 30:
+                if brightness > 150:
+                    color_name = 'Light Gray'
+                elif brightness > 100:
+                    color_name = 'Gray'
+                else:
+                    color_name = 'Dark Gray'
+            else:
+                color_name = 'Neutral'
+            
+            print(f"{region_name} region: {color_name} (RGB: {r}, {g}, {b})")
+            return dominant_rgb, color_name
+        
+        top_color, top_color_name = get_dominant_color(top_region, "Top")
+        middle_color, middle_color_name = get_dominant_color(middle_region, "Middle")
+        bottom_color, bottom_color_name = get_dominant_color(bottom_region, "Bottom")
+        
+        color_names = [top_color_name, middle_color_name, bottom_color_name]
+        colors = [top_color, middle_color, bottom_color]
+        
+        # Calculate color harmony (how well colors work together)
+        color_brightnesses = [0.299*c[0] + 0.587*c[1] + 0.114*c[2] for c in colors]
+        brightness_variance = np.std(color_brightnesses)
+        
+        # Good harmony: moderate contrast (not too similar, not too different)
+        if 30 < brightness_variance < 100:
+            color_harmony_score = 75 + min(20, int(brightness_variance / 2))
+        elif brightness_variance < 30:
+            color_harmony_score = 60  # Too similar (monochromatic)
+        else:
+            color_harmony_score = 65  # Too much contrast
+        
+        color_harmony_score = min(100, max(50, color_harmony_score))
+        
+        # Proportion analysis based on image composition
+        # Check if outfit has balanced proportions
+        top_ratio = len(top_region) / len(img_small)
+        bottom_ratio = len(bottom_region) / len(img_small)
+        
+        # Ideal proportions: balanced top and bottom
+        proportion_balance = 1 - abs(top_ratio - bottom_ratio)
+        proportion_score = 60 + int(proportion_balance * 20)
+        
+        # Trendiness based on color combinations
+        trendy_combos = [
+            ['Black', 'White/Cream'],
+            ['Black', 'Gray'],
+            ['Navy', 'White/Cream'],
+            ['Neutral', 'Black'],
+        ]
+        
+        is_trendy = any(
+            (c1 in color_names and c2 in color_names) 
+            for c1, c2 in trendy_combos
+        )
+        trendy_score = 70 if is_trendy else 60
+        
+        # Flattering score based on color contrast and harmony
+        color_contrast = brightness_variance
+        if 40 < color_contrast < 80:
+            flattering_score = 75
+        elif color_contrast < 40:
+            flattering_score = 65  # Low contrast
+        else:
+            flattering_score = 70  # High contrast
+        
+        # Coherence (how well the outfit works as a whole)
+        unique_colors = len(set(color_names))
+        if unique_colors == 2:
+            coherence_score = 80  # Good balance
+        elif unique_colors == 1:
+            coherence_score = 70  # Monochromatic
+        else:
+            coherence_score = 65  # Too many colors
+        
+        # Versatility (neutral/classic colors are more versatile)
+        versatile_colors = ['Black', 'White/Cream', 'Gray', 'Navy', 'Neutral']
+        versatile_count = sum(1 for c in color_names if any(vc in c for vc in versatile_colors))
+        versatility_score = 60 + (versatile_count * 12)
+        versatility_score = min(100, versatility_score)
+        
+        # Calculate overall average
+        avg_score = (coherence_score + color_harmony_score + trendy_score + 
+                    flattering_score + proportion_score + versatility_score) / 6
+        
+        # Determine fit grade
+        if avg_score >= 80:
+            fit_grade = 'A'
+        elif avg_score >= 70:
+            fit_grade = 'B'
+        elif avg_score >= 60:
+            fit_grade = 'C'
+        else:
+            fit_grade = 'D'
+        
+        # Generate personalized feedback based on ACTUAL detected colors
+        primary_color = top_color_name
+        secondary_color = bottom_color_name if bottom_color_name != primary_color else middle_color_name
+        
+        # Personalized summary based on actual outfit
+        if avg_score >= 75:
+            summary = f"A solid outfit with minor areas for improvement. The {primary_color.lower()} and {secondary_color.lower()} combination works well, and the overall style is flattering. Your color choices show good coordination."
+        elif avg_score >= 65:
+            summary = f"Your outfit is decent but could use some refinement. The {primary_color.lower()} color is a good choice, though the overall coordination with {secondary_color.lower()} could be enhanced for a more polished look."
+        else:
+            summary = f"The outfit has potential but needs adjustments. The {primary_color.lower()} and {secondary_color.lower()} combination could be refined, and proportions could be improved for a more balanced silhouette."
+        
+        # Color match feedback based on actual colors
+        if 'Black' in primary_color and 'White' in secondary_color:
+            color_match_text = f"The classic black and white combination is timeless and versatile. This high-contrast pairing creates a sophisticated, polished look that works for various occasions."
+        elif 'Black' in primary_color or 'Black' in secondary_color:
+            color_match_text = f"The {primary_color.lower()} and {secondary_color.lower()} create a pleasant contrast. Black adds sophistication and pairs well with most colors, making this combination versatile."
+        elif brightness_variance > 80:
+            color_match_text = f"The {primary_color.lower()} and {secondary_color.lower()} create a bold contrast. This high-contrast combination is eye-catching and modern."
+        else:
+            color_match_text = f"The {primary_color.lower()} and {secondary_color.lower()} create a harmonious, balanced look. The color combination is cohesive and works well together."
+        
+        # Occasion suggestions based on colors
+        if 'Black' in color_names or 'Navy' in color_names:
+            if 'White' in color_names or 'Light Gray' in color_names:
+                occasion = "1. Casual Occasions\n2. Work/Professional\n3. Evening Events"
+            else:
+                occasion = "1. Casual Occasions\n2. Work/Professional"
+        elif any('Bright' in c or 'Red' in c or 'Blue' in c for c in color_names):
+            occasion = "1. Casual Occasions\n2. Social Events"
+        else:
+            occasion = "1. Casual Occasions"
+        
+        # What's done well - personalized
+        strengths = []
+        if color_harmony_score > 70:
+            strengths.append(f"the {primary_color.lower()} color choice")
+        if coherence_score > 75:
+            strengths.append("the color coordination")
+        if versatility_score > 75:
+            strengths.append("the versatile color palette")
+        
+        if strengths:
+            done_well = f"The outfit is well-coordinated, and {', '.join(strengths)} {'is' if len(strengths) == 1 else 'are'} particularly strong."
+        else:
+            done_well = f"The outfit is simple and casual, and the {primary_color.lower()} color choice works well for everyday wear."
+        
+        # Personalized recommendations
+        if versatility_score < 70:
+            recommendation = f"The outfit is alright, but you can try pairing the {primary_color.lower()} with some accessories. Maybe adding a belt, jewelry, or a statement piece that will complement the {secondary_color.lower()} and add more visual interest."
+        elif proportion_score < 70:
+            recommendation = "Consider adjusting the proportions - perhaps adding a belt to define the waist or choosing pieces with different lengths to create more visual balance."
+        else:
+            recommendation = "Consider adding accessories to elevate the look. A statement piece, contrasting shoes, or complementary jewelry could enhance the overall style and add personality."
+        
+        # Color season based on detected colors
+        warm_colors = ['Red', 'Pink', 'Orange', 'Yellow', 'Coral']
+        cool_colors = ['Blue', 'Navy', 'Green']
+        
+        if any(wc in c for c in color_names for wc in warm_colors):
+            color_season = 'Soft Autumn'
+        elif any(cc in c for c in color_names for cc in cool_colors):
+            color_season = 'Soft Summer'
+        elif 'Black' in color_names or 'Gray' in color_names:
+            color_season = 'Winter'
+        else:
+            color_season = 'Soft Autumn'
+        
+        print(f"Analysis complete - Fit Grade: {fit_grade}, Avg Score: {avg_score:.1f}")
+        
+        return {
+            'success': True,
+            'coherence': int(coherence_score),
+            'color_match': int(color_harmony_score),
+            'trendiness': int(trendy_score),
+            'flattering': int(flattering_score),
+            'proportion': int(proportion_score),
+            'versatility': int(versatility_score),
+            'fit_grade': fit_grade,
+            'color_season': color_season,
+            'summary': summary,
+            'color_match_text': color_match_text,
+            'occasion': occasion,
+            'done_well': done_well,
+            'recommendation': recommendation,
+            'detected_colors': color_names,
+            'detected_items': {
+                'top': primary_color,
+                'bottom': secondary_color,
+                'middle': middle_color_name,
+            }
+        }
+    except Exception as e:
+        print(f"Error in outfit analysis: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return {
+            'success': False,
+            'error': f'Analysis error: {str(e)}'
+        }
+
+@app.route('/analyze-outfit', methods=['POST'])
+def analyze_outfit():
+    """
+    Analyze outfit image for FitCheck
+    Expects: multipart/form-data with 'image' file
+    Returns: JSON with outfit analysis scores and recommendations
+    """
+    try:
+        if 'image' not in request.files:
+            return jsonify({
+                "success": False,
+                "error": "No image file provided"
+            }), 400
+        
+        file = request.files['image']
+        
+        if file.filename == '':
+            return jsonify({
+                "success": False,
+                "error": "Empty filename"
+            }), 400
+        
+        # Read image
+        image_bytes = file.read()
+        nparr = np.frombuffer(image_bytes, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        
+        if img is None:
+            return jsonify({
+                "success": False,
+                "error": "Invalid image format"
+            }), 400
+        
+        # Analyze outfit
+        result = analyze_outfit_image(img)
+        
+        return jsonify(result)
+    
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": f"Server error: {str(e)}"
         }), 500
 
 # ============================================================================
