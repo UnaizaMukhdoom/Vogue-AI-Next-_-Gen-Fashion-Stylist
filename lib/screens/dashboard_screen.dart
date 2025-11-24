@@ -238,9 +238,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         Expanded(
                           child: _FitCheckCard(
                             onTap: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Fit Check coming soon!')),
-                              );
+                              Navigator.pushNamed(context, '/fitcheck-intro');
                             },
                           ),
                         ),
@@ -436,11 +434,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _NavItem(icon: Icons.home, label: 'Home', isActive: true),
-              _NavItem(icon: Icons.checkroom, label: 'My Closet'),
-              _NavItem(icon: Icons.camera_alt, label: 'Scan', isCenter: true),
-              _NavItem(icon: Icons.explore, label: 'Discover'),
-              _NavItem(icon: Icons.person, label: 'Profile'),
+              _NavItem(icon: Icons.home, label: 'Home', isActive: true, onTap: () {}),
+              _NavItem(icon: Icons.checkroom, label: 'My Closet', onTap: () { Navigator.pushNamed(context, '/closet'); }),
+              _NavItem(icon: Icons.camera_alt, label: 'Scan', isCenter: true, onTap: () { Navigator.pushNamed(context, '/camera-options'); }),
+              _NavItem(icon: Icons.explore, label: 'Discover', onTap: () { Navigator.pushNamed(context, '/discover'); }),
+              _NavItem(icon: Icons.person, label: 'Profile', onTap: () { 
+                Navigator.pushNamed(context, '/profile');
+              }),
             ],
           ),
         ),
@@ -518,7 +518,7 @@ class _ColorAnalysisCard extends StatelessWidget {
           Container(
             width: 100,
             height: 100,
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               shape: BoxShape.circle,
               gradient: SweepGradient(
                 colors: [
@@ -553,11 +553,11 @@ class _ColorAnalysisCard extends StatelessWidget {
                   ),
                 ),
                 // Checkmarks
-                Positioned(
+                const Positioned(
                   top: 8,
                   left: 0,
                   right: 0,
-                  child: const Center(
+                  child: Center(
                     child: Icon(
                       Icons.check_circle,
                       color: Colors.green,
@@ -565,11 +565,11 @@ class _ColorAnalysisCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                Positioned(
+                const Positioned(
                   bottom: 8,
                   left: 0,
                   right: 0,
-                  child: const Center(
+                  child: Center(
                     child: Icon(
                       Icons.check_circle,
                       color: Colors.green,
@@ -938,55 +938,63 @@ class _NavItem extends StatelessWidget {
   final String label;
   final bool isActive;
   final bool isCenter;
+  final VoidCallback onTap;
 
   const _NavItem({
     required this.icon,
     required this.label,
     this.isActive = false,
     this.isCenter = false,
+    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     if (isCenter) {
-      return Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFC857),
-              shape: BoxShape.circle,
+      return GestureDetector(
+        onTap: onTap,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: const BoxDecoration(
+                color: Color(0xFFFFC857),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                color: Colors.black,
+                size: 24,
+              ),
             ),
-            child: Icon(
-              icon,
-              color: Colors.black,
-              size: 24,
-            ),
-          ),
-        ],
+          ],
+        ),
       );
     }
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          icon,
-          color: isActive ? Colors.white : Colors.white70,
-          size: 24,
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
             color: isActive ? Colors.white : Colors.white70,
-            fontSize: 12,
-            fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+            size: 24,
           ),
-        ),
-      ],
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: isActive ? Colors.white : Colors.white70,
+              fontSize: 12,
+              fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

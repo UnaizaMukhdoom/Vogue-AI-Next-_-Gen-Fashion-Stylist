@@ -11,6 +11,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../services/skin_analysis_service.dart';
+import '../utils/image_compressor.dart';
+import '../utils/error_handler.dart';
 
 class SelfieScreen extends StatefulWidget {
 
@@ -94,9 +96,12 @@ class _SelfieScreenState extends State<SelfieScreen> with SingleTickerProviderSt
 
     try {
 
+      // Compress image before uploading
+      final compressedPath = await ImageCompressor.compressImage(_picked!.path);
+      final imagePath = compressedPath ?? _picked!.path;
+      
       // Call the analysis API
-
-      final result = await SkinAnalysisService.analyzeImage(_picked!.path);
+      final result = await SkinAnalysisService.analyzeImage(imagePath);
 
       
 
@@ -147,13 +152,8 @@ class _SelfieScreenState extends State<SelfieScreen> with SingleTickerProviderSt
 
       
 
-      // Show error and navigate with default values
-      String errorMessage = 'Analysis failed';
-      if (e.toString().contains('Connection refused') || e.toString().contains('SocketException')) {
-        errorMessage = 'Cannot connect to analysis server. Please start the Flask API server at http://localhost:5000';
-      } else {
-        errorMessage = 'Analysis failed: $e';
-      }
+      // Show user-friendly error message
+      final errorMessage = ErrorHandler.getErrorMessage(e);
 
       ScaffoldMessenger.of(context).showSnackBar(
 

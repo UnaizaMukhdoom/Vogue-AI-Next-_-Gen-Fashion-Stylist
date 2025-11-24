@@ -712,7 +712,7 @@ class _BodyShapePainter extends CustomPainter {
       ..style = PaintingStyle.fill;
 
     final centerX = size.width / 2;
-    final bodyTop = 0.0;
+    const bodyTop = 0.0;
     final bodyHeight = size.height;
     final maxWidth = size.width;
 

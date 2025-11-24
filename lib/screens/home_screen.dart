@@ -71,7 +71,7 @@ class HomeScreen extends StatelessWidget {
                   bg: const Color(0xFFFFC857),
                   title: "Fit\nCheck",
                   icon: Icons.check_circle_outline,
-                  onTap: () => Navigator.pushNamed(context, '/selfie'),
+                  onTap: () => Navigator.pushNamed(context, '/fitcheck-intro'),
                 ),
               ),
             ],
@@ -108,7 +108,7 @@ class HomeScreen extends StatelessWidget {
       bottomNavigationBar: _BottomBar(
         onHome: () {},
         onCloset: () => Navigator.pushNamed(context, '/closet'),
-        onSnap: () => Navigator.pushNamed(context, '/selfie'),
+        onSnap: () => Navigator.pushNamed(context, '/camera-options'),
         onAI: () => Navigator.pushNamed(context, '/ai'),
         onProfile: () {
           ScaffoldMessenger.of(context).showSnackBar(

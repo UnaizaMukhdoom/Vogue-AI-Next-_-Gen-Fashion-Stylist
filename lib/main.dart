@@ -1,4 +1,6 @@
 // lib/main.dart
+// USER APP ENTRY POINT - For Android/Mobile builds
+// DO NOT import admin screens here - admin code is in admin_main.dart
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 
@@ -11,13 +13,32 @@ import 'screens/dashboard_screen.dart';
 import 'screens/questionnaire_flow_screen.dart';
 import 'screens/selfie_screen.dart';
 import 'screens/result_screen.dart';
+import 'screens/discover_screen.dart';
+import 'screens/closet_screen.dart';
+import 'screens/camera_options_screen.dart';
+import 'screens/check_item_camera_screen.dart';
+import 'screens/import_item_link_screen.dart';
+import 'screens/analyzing_item_screen.dart';
+import 'screens/item_result_screen.dart';
+import 'screens/create_outfit_screen.dart';
+import 'screens/fitcheck_intro_screen.dart';
+import 'screens/fitcheck_camera_screen.dart';
+import 'screens/fitcheck_analyzing_screen.dart';
+import 'screens/fitcheck_results_screen.dart';
 import 'screens/firebase_test_screen.dart';
+import 'screens/profile_screen.dart';
+import 'screens/style_profile_screen.dart';
+import 'screens/privacy_policy_screen.dart';
+import 'screens/terms_of_service_screen.dart';
+import 'utils/app_info.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  // Initialize app info
+  await AppInfo.initialize();
   runApp(const MyApp());
 }
 
@@ -38,7 +59,19 @@ class MyApp extends StatelessWidget {
         '/questionnaire': (_) => const QuestionnaireFlowScreen(),
         '/selfie': (_) => const SelfieScreen(),
         '/result': (_) => const ResultScreen(), // Removed const since it reads route args
+        '/camera-options': (_) => const CameraOptionsScreen(),
+        '/check-item-camera': (_) => const CheckItemCameraScreen(),
+        '/import-item-link': (_) => const ImportItemLinkScreen(),
+        '/create-outfit': (_) => const CreateOutfitScreen(),
+        '/fitcheck-intro': (_) => const FitCheckIntroScreen(),
+        '/fitcheck-camera': (_) => const FitCheckCameraScreen(),
+        '/discover': (_) => const DiscoverScreen(),
+        '/closet': (_) => const ClosetScreen(),
         '/firebase-test': (_) => const FirebaseTestScreen(), // Firebase connection test
+        '/profile': (_) => const ProfileScreen(),
+        '/style-profile': (_) => const StyleProfileScreen(),
+        '/privacy': (_) => const PrivacyPolicyScreen(),
+        '/terms': (_) => const TermsOfServiceScreen(),
       },
     );
   }
