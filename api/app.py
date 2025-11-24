@@ -25,6 +25,20 @@ except Exception as e:
     SCRAPER_AVAILABLE = False
     print(f"⚠ Warning: error loading scraper module: {e}")
 
+# Import chatbot helper - required for /chatbot/chat endpoint
+try:
+    from chatbot_helper import get_chatbot_response, is_chatbot_available, load_chatbot_model
+    CHATBOT_AVAILABLE = True
+    print("✓ Chatbot module loaded successfully")
+    # Pre-load chatbot model
+    load_chatbot_model()
+except ImportError as e:
+    CHATBOT_AVAILABLE = False
+    print(f"⚠ Warning: chatbot module not available: {e}")
+except Exception as e:
+    CHATBOT_AVAILABLE = False
+    print(f"⚠ Warning: error loading chatbot module: {e}")
+
 app = Flask(__name__)
 CORS(app)  # Allow Flutter app to call this API
 
@@ -377,7 +391,9 @@ def home():
             "/analyze": "POST - Upload image for analysis",
             "/health": "GET - Health check",
             "/scrape-clothes": "POST - Scrape clothes based on skin tone",
-            "/analyze-outfit": "POST - Analyze outfit for FitCheck"
+            "/analyze-outfit": "POST - Analyze outfit for FitCheck",
+            "/chatbot/chat": "POST - Chat with AI fashion stylist",
+            "/chatbot/health": "GET - Chatbot health check"
         }
     })
 
@@ -842,6 +858,82 @@ def analyze_outfit():
         return jsonify({
             "success": False,
             "error": f"Server error: {str(e)}"
+        }), 500
+
+# ============================================================================
+# CHATBOT ENDPOINTS
+# ============================================================================
+
+@app.route('/chatbot/chat', methods=['POST'])
+def chatbot_chat():
+    """
+    Chatbot endpoint for AI Stylist
+    Expects: JSON with 'message' and optional 'context'
+    Returns: JSON with 'response'
+    """
+    try:
+        data = request.get_json()
+        if not data or 'message' not in data:
+            return jsonify({
+                "success": False,
+                "error": "No message provided"
+            }), 400
+        
+        user_message = data['message']
+        context = data.get('context', 'fashion_styling')
+        
+        # Check if chatbot is available
+        if not CHATBOT_AVAILABLE:
+            return jsonify({
+                "success": False,
+                "error": "Chatbot service is not available"
+            }), 503
+        
+        # Get chatbot response
+        try:
+            response = get_chatbot_response(user_message, context)
+            return jsonify({
+                "success": True,
+                "response": response,
+                "context": context
+            }), 200
+        except Exception as e:
+            return jsonify({
+                "success": False,
+                "error": f"Error generating response: {str(e)}"
+            }), 500
+        
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@app.route('/chatbot/health', methods=['GET'])
+def chatbot_health():
+    """Health check for chatbot service"""
+    try:
+        if not CHATBOT_AVAILABLE:
+            return jsonify({
+                "status": "unavailable",
+                "service": "chatbot",
+                "model_loaded": False,
+                "vectorizer_loaded": False,
+                "message": "Chatbot module not loaded"
+            }), 503
+        
+        model_available = is_chatbot_available()
+        return jsonify({
+            "status": "healthy" if model_available else "fallback_mode",
+            "service": "chatbot",
+            "model_loaded": model_available,
+            "message": "Chatbot is available" if model_available else "Using fallback responses"
+        }), 200
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "service": "chatbot",
+            "error": str(e)
         }), 500
 
 # ============================================================================
