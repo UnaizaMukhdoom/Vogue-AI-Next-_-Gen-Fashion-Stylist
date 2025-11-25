@@ -31,7 +31,7 @@ _chatbot_loaded = False
 def load_chatbot_model():
     """
     Load the trained chatbot model and vectorizer
-    This function will try to load model files from the chatbot repository
+    This function will try to load model files from the chatbot directory
     """
     global _chatbot_model, _chatbot_vectorizer, _chatbot_responses, _chatbot_loaded
     
@@ -44,8 +44,13 @@ def load_chatbot_model():
         return None, None
     
     try:
-        # Try to load model files (adjust paths based on your actual model files)
+        # Look for model files in chatbot directory and current directory
+        chatbot_dir = os.path.join(os.path.dirname(__file__), 'Chatbot')
         model_paths = [
+            os.path.join(chatbot_dir, 'intent_classifier.pkl'),
+            os.path.join(chatbot_dir, 'chatbot_model.pkl'),
+            os.path.join(chatbot_dir, 'model.pkl'),
+            os.path.join(chatbot_dir, 'fashion_chatbot_model.pkl'),
             'intent_classifier.pkl',
             'chatbot_model.pkl',
             'model.pkl',
@@ -53,9 +58,11 @@ def load_chatbot_model():
         ]
         
         vectorizer_paths = [
+            os.path.join(chatbot_dir, 'vectorizer.pkl'),
+            os.path.join(chatbot_dir, 'tfidf_vectorizer.pkl'),
+            os.path.join(chatbot_dir, 'vectorizer.pkl'),
             'vectorizer.pkl',
-            'tfidf_vectorizer.pkl',
-            'vectorizer.pkl'
+            'tfidf_vectorizer.pkl'
         ]
         
         # Load model
@@ -75,6 +82,9 @@ def load_chatbot_model():
         # Load responses from dataset if available
         if pd is not None:
             dataset_paths = [
+                os.path.join(chatbot_dir, 'fashion_dataset_balanced.csv'),
+                os.path.join(chatbot_dir, 'fashion_dataset_language_fixed.csv'),
+                os.path.join(chatbot_dir, 'fashion_dataset_with_indices.csv'),
                 'fashion_dataset_balanced.csv',
                 'fashion_dataset_language_fixed.csv',
                 'fashion_dataset_with_indices.csv'
@@ -84,14 +94,22 @@ def load_chatbot_model():
                 if os.path.exists(path):
                     try:
                         df = pd.read_csv(path)
-                        # Extract responses based on your dataset structure
-                        # This is a placeholder - adjust based on your actual dataset
-                        if 'Response' in df.columns:
-                            _chatbot_responses = df.set_index('Intent')['Response'].to_dict()
-                        elif 'response' in df.columns:
-                            _chatbot_responses = df.set_index('intent')['response'].to_dict()
-                        print(f"✓ Chatbot responses loaded from {path}")
-                        break
+                        df.columns = df.columns.str.strip().str.lower()
+                        
+                        # Find intent and response columns (handle various naming conventions)
+                        intent_col = None
+                        response_col = None
+                        
+                        for col in df.columns:
+                            if col in ['intent']:
+                                intent_col = col
+                            elif col in ['response', 'bot_response', 'answer']:
+                                response_col = col
+                        
+                        if intent_col and response_col:
+                            _chatbot_responses = df.set_index(intent_col)[response_col].to_dict()
+                            print(f"✓ Chatbot responses loaded from {path}")
+                            break
                     except Exception as e:
                         print(f"⚠ Could not load responses from {path}: {e}")
         

@@ -1,0 +1,9 @@
+Query,Intent,Response
+"What colors suit me?",color_advice,"Colors that complement your skin tone can enhance your natural features. Consider trying colors that create contrast with your undertone for a more vibrant look."
+"How do I style a blazer?",outfit_suggestion,"For a blazer, try pairing it with well-fitted jeans or trousers. Add a simple top underneath and complete the look with statement accessories like a belt or jewelry."
+"What should I wear to a wedding?",outfit_suggestion,"For a wedding, consider a classic dress or suit in elegant colors. For women, a midi dress in jewel tones works well. For men, a well-fitted suit with a tie."
+"Hello",greeting,"Hello! I'm your AI fashion stylist. How can I help you today?"
+"Hi",greeting,"Hi there! Ready to discover your perfect style?"
+"Thanks",goodbye,"You're welcome! Feel free to come back anytime for more fashion advice. Have a stylish day!"
+"What are some style tips?",style_tips,"Here are some style tips: focus on fit first - well-fitted clothes look more expensive. Accessorize thoughtfully, and don't be afraid to express your personality through your style."
+

@@ -15,16 +15,13 @@ import 'screens/selfie_screen.dart';
 import 'screens/result_screen.dart';
 import 'screens/discover_screen.dart';
 import 'screens/closet_screen.dart';
+import 'screens/ai_stylist_screen.dart';
 import 'screens/camera_options_screen.dart';
 import 'screens/check_item_camera_screen.dart';
 import 'screens/import_item_link_screen.dart';
-import 'screens/analyzing_item_screen.dart';
-import 'screens/item_result_screen.dart';
 import 'screens/create_outfit_screen.dart';
 import 'screens/fitcheck_intro_screen.dart';
 import 'screens/fitcheck_camera_screen.dart';
-import 'screens/fitcheck_analyzing_screen.dart';
-import 'screens/fitcheck_results_screen.dart';
 import 'screens/firebase_test_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/style_profile_screen.dart';
@@ -67,6 +64,7 @@ class MyApp extends StatelessWidget {
         '/fitcheck-camera': (_) => const FitCheckCameraScreen(),
         '/discover': (_) => const DiscoverScreen(),
         '/closet': (_) => const ClosetScreen(),
+        AIStylistScreen.route: (_) => const AIStylistScreen(), // AI Stylist (Chatbot)
         '/firebase-test': (_) => const FirebaseTestScreen(), // Firebase connection test
         '/profile': (_) => const ProfileScreen(),
         '/style-profile': (_) => const StyleProfileScreen(),

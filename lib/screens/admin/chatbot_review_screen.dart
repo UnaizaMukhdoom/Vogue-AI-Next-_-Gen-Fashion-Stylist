@@ -14,6 +14,9 @@ class _ChatbotReviewScreenState extends State<ChatbotReviewScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('Chatbot Conversations'),
+      ),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('chatbot_conversations')

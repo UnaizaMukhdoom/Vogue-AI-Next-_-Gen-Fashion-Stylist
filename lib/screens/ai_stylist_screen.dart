@@ -167,8 +167,8 @@ class _AIStylistScreenState extends State<AIStylistScreen> {
                     ),
                     const SizedBox(width: 8),
                     Container(
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFC857),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFFFC857),
                         shape: BoxShape.circle,
                       ),
                       child: IconButton(
@@ -255,13 +255,13 @@ class _TypingIndicator extends StatelessWidget {
             bottomLeft: const Radius.circular(4),
           ),
         ),
-        child: Row(
+        child: const Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             _Dot(delay: 0),
-            const SizedBox(width: 4),
+            SizedBox(width: 4),
             _Dot(delay: 200),
-            const SizedBox(width: 4),
+            SizedBox(width: 4),
             _Dot(delay: 400),
           ],
         ),

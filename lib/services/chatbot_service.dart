@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 class ChatbotService {
-  // Use your existing Railway URL
+  // Use your Railway URL - update this when deploying
   static const String baseUrl = 'https://amiable-encouragement-production.up.railway.app';
   
   /// Get chatbot response
