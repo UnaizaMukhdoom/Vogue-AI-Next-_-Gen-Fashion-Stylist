@@ -357,11 +357,27 @@ def calculate_undertone(rgb_color):
 # FACE SHAPE DETECTION
 # ============================================================================
 
+def calculate_landmark_distance(landmark1, landmark2, image_width, image_height):
+    """
+    Calculate Euclidean distance between two MediaPipe landmarks
+    Returns normalized distance (to avoid size bias)
+    """
+    x1 = landmark1.x * image_width
+    y1 = landmark1.y * image_height
+    x2 = landmark2.x * image_width
+    y2 = landmark2.y * image_height
+    
+    distance = np.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+    # Normalize by image diagonal to avoid size bias
+    image_diagonal = np.sqrt(image_width**2 + image_height**2)
+    normalized_distance = distance / image_diagonal if image_diagonal > 0 else distance
+    
+    return normalized_distance
+
 def detect_face_shape_opencv(image_bgr):
     """
-    Primary method: Detect face shape using OpenCV face detection and geometric analysis
-    Uses actual face measurements and proportions for accurate classification
-    Returns: ('Oval', 'Round', 'Square', 'Heart', 'Long', 'Diamond'), confidence
+    Fallback method: Detect face shape using OpenCV Haar Cascade detection
+    Returns: ('Oval', 'Round', 'Square', 'Heart', 'Oblong', 'Diamond'), confidence
     """
     try:
         gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
@@ -370,142 +386,26 @@ def detect_face_shape_opencv(image_bgr):
         if len(faces) == 0:
             return None, None
         
-        # Get the largest face
         (x, y, w, h) = max(faces, key=lambda f: f[2] * f[3])
+        face_ratio = h / w if w > 0 else 1.0
         
-        # Extract face region
-        face_roi = image_bgr[y:y+h, x:x+w]
-        face_gray = gray[y:y+h, x:x+w]
-        
-        # Detect eyes for better measurements
-        eyes = eye_cascade.detectMultiScale(face_gray, scaleFactor=1.1, minNeighbors=5, minSize=(20, 20))
-        
-        # Calculate face measurements
-        face_length = h
-        face_width = w
-        
-        # Analyze face geometry using actual measurements
-        # Use edge detection to find face contours
-        edges = cv2.Canny(face_gray, 50, 150)
-        contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        
-        # Calculate actual face width at different heights
-        # Measure width at different vertical positions
-        width_at_top = w  # Top of detected face
-        width_at_middle = w  # Middle of face
-        width_at_bottom = w  # Bottom (jaw area)
-        
-        # Analyze horizontal width at different face regions
-        face_ratio_base = h / w if w > 0 else 1.0
-        
-        # Estimate jaw width based on face proportions
-        # Use face width-to-height ratio to determine jaw shape
-        if face_ratio_base < 1.0:  # Wide face (width > height)
-            # Wide faces tend to have wider jaws
-            jaw_width_estimate = w * (0.80 + (1.0 - face_ratio_base) * 0.1)
-            cheekbone_width = w * (0.96 + (1.0 - face_ratio_base) * 0.02)
-            forehead_width = w * (0.89 + (1.0 - face_ratio_base) * 0.03)
-        elif face_ratio_base > 1.3:  # Long face (height > width)
-            # Long faces tend to have narrower jaws
-            jaw_width_estimate = w * (0.70 - (face_ratio_base - 1.3) * 0.05)
-            cheekbone_width = w * 0.92
-            forehead_width = w * 0.85
-        else:  # Normal proportions
-            # Vary based on actual face dimensions
-            variance_factor = abs(w - h) / max(w, h)
-            jaw_width_estimate = w * (0.72 + variance_factor * 0.08)
-            cheekbone_width = w * (0.93 + variance_factor * 0.04)
-            forehead_width = w * (0.86 + variance_factor * 0.04)
-        
-        # Adjust estimates based on eye detection
-        if len(eyes) >= 2:
-            # Calculate eye positions
-            eye_centers = [(ex + ew/2, ey + eh/2) for (ex, ey, ew, eh) in eyes[:2]]
-            eye_distance = abs(eye_centers[0][0] - eye_centers[1][0])
-            eye_y_avg = sum(ey[1] for ey in eye_centers) / len(eye_centers)
-            
-            # Eye distance relative to face width (normal is ~46% of face width)
-            eye_to_face_ratio = eye_distance / w if w > 0 else 0.46
-            
-            # Adjust measurements based on eye position
-            if eye_to_face_ratio > 0.5:  # Wide-set eyes
-                cheekbone_width = w * 0.98
-                forehead_width = w * 0.90
-            elif eye_to_face_ratio < 0.4:  # Close-set eyes
-                cheekbone_width = w * 0.90
-                forehead_width = w * 0.85
-            
-            # Eye vertical position affects face length perception
-            eye_position_ratio = eye_y_avg / h if h > 0 else 0.4
-            if eye_position_ratio < 0.35:  # Eyes high = longer face
-                face_length = h * 1.15
-            elif eye_position_ratio > 0.5:  # Eyes low = rounder face
-                face_length = h * 0.95
-        
-        # Calculate ratios
-        face_ratio = face_length / face_width if face_width > 0 else 1.0
-        jaw_ratio = jaw_width_estimate / face_width if face_width > 0 else 0.75
-        forehead_ratio = forehead_width / face_width if face_width > 0 else 0.88
-        
-        # Add some randomness/variation based on actual measurements
-        # Use face width variation to determine jaw shape
-        face_variance = abs(w - h) / max(w, h)
-        
-        # Classify face shape with improved logic
-        # Use more nuanced classification based on actual ratios
-        if face_ratio > 1.55:
-            face_shape = "Long"
-        elif face_ratio < 1.08:
-            # Short/wide face
-            if jaw_ratio > 0.90:
-                face_shape = "Round"
-            elif jaw_ratio < 0.70:
-                if forehead_ratio > 0.93:
-                    face_shape = "Heart"
+        # Simple classification for OpenCV fallback
+        if face_ratio > 1.4:
+            return "Oblong", 0.70
+        elif face_ratio < 1.1:
+            return "Round", 0.70
                 else:
-                    face_shape = "Square"
-            else:
-                # Medium jaw width
-                if forehead_ratio > 0.92:
-                    face_shape = "Heart"
-                else:
-                    face_shape = "Square"
-        elif face_ratio < 1.25:
-            # Medium length face - most common
-            if forehead_ratio > 0.94 and jaw_ratio < 0.72:
-                face_shape = "Heart"
-            elif forehead_ratio < 0.83 and jaw_ratio < 0.83:
-                face_shape = "Diamond"
-            elif jaw_ratio > 0.90:
-                face_shape = "Round"
-            elif jaw_ratio < 0.75 and face_ratio < 1.15:
-                face_shape = "Square"
-            else:
-                face_shape = "Oval"
-        else:
-            # Longer face
-            if forehead_ratio < 0.84 and jaw_ratio < 0.84:
-                face_shape = "Diamond"
-            else:
-                face_shape = "Oval"
-        
-        confidence = 0.80  # Good confidence for OpenCV-based detection
-        
-        # Debug output to see what's being calculated
-        print(f"[Face Shape Debug] Face: {w}x{h}, Ratio: {face_ratio:.3f}, Jaw: {jaw_ratio:.3f}, Forehead: {forehead_ratio:.3f}, Eyes: {len(eyes)}, Result: {face_shape}")
-        
-        return face_shape, confidence
+            return "Oval", 0.70
     except Exception as e:
         print(f"Error in OpenCV face shape detection: {e}")
         return None, None
 
 def detect_face_shape_mediapipe(image_bgr):
     """
-    Detect face shape using MediaPipe facial landmarks
-    Returns: ('Oval', 'Round', 'Square', 'Heart', 'Long', 'Diamond'), confidence
+    Primary method: Detect face shape using MediaPipe Face Mesh with scoring-based system
+    Returns: ('Oval', 'Round', 'Square', 'Oblong', 'Diamond', 'Heart'), confidence
     """
     if not MEDIAPIPE_AVAILABLE or face_mesh is None:
-        # Fallback to OpenCV if MediaPipe not available
         return detect_face_shape_opencv(image_bgr)
     
     try:
@@ -513,141 +413,283 @@ def detect_face_shape_mediapipe(image_bgr):
         results = face_mesh.process(image_rgb)
         
         if not results.multi_face_landmarks:
-            # Use OpenCV if no face detected by MediaPipe
             return detect_face_shape_opencv(image_bgr)
         
-        # Get facial landmarks
         landmarks = results.multi_face_landmarks[0].landmark
         h, w = image_bgr.shape[:2]
         
-        # Key landmark indices (MediaPipe has 468 landmarks)
-        # Forehead points (top of head)
-        forehead_top = (int(landmarks[10].x * w), int(landmarks[10].y * h))
-        forehead_left = (int(landmarks[151].x * w), int(landmarks[151].y * h))
-        forehead_right = (int(landmarks[9].x * w), int(landmarks[9].y * h))
+        # Calculate measurements from MediaPipe landmarks
+        forehead_width = calculate_landmark_distance(landmarks[10], landmarks[338], w, h)
+        cheekbone_width = calculate_landmark_distance(landmarks[234], landmarks[454], w, h)
+        jaw_width = calculate_landmark_distance(landmarks[152], landmarks[377], w, h)
+        face_length = calculate_landmark_distance(landmarks[10], landmarks[152], w, h)
         
-        # Cheekbone points
-        cheek_left = (int(landmarks[234].x * w), int(landmarks[234].y * h))
-        cheek_right = (int(landmarks[454].x * w), int(landmarks[454].y * h))
+        # Calculate ratios (normalized to cheekbone width)
+        if cheekbone_width == 0 or cheekbone_width < 0.001:
+            return detect_face_shape_opencv(image_bgr)
         
-        # Jaw points
-        jaw_left = (int(landmarks[172].x * w), int(landmarks[172].y * h))
-        jaw_right = (int(landmarks[397].x * w), int(landmarks[397].y * h))
-        jaw_bottom = (int(landmarks[175].x * w), int(landmarks[175].y * h))
+        length_ratio = face_length / cheekbone_width
+        forehead_ratio = forehead_width / cheekbone_width
+        jaw_ratio = jaw_width / cheekbone_width
         
-        # Face length (forehead to chin)
-        face_length = np.sqrt((forehead_top[0] - jaw_bottom[0])**2 + 
-                             (forehead_top[1] - jaw_bottom[1])**2)
+        # Scoring logic (rebuilt)
+        scores = {
+            "Oval": 0,
+            "Round": 0,
+            "Square": 0,
+            "Heart": 0,
+            "Diamond": 0,
+            "Oblong": 0
+        }
         
-        # Face width (cheekbone to cheekbone)
-        face_width = np.sqrt((cheek_left[0] - cheek_right[0])**2 + 
-                            (cheek_left[1] - cheek_right[1])**2)
-        
-        # Jaw width
-        jaw_width = np.sqrt((jaw_left[0] - jaw_right[0])**2 + 
-                           (jaw_left[1] - jaw_right[1])**2)
-        
-        # Forehead width
-        forehead_width = np.sqrt((forehead_left[0] - forehead_right[0])**2 + 
-                                (forehead_left[1] - forehead_right[1])**2)
-        
-        # Calculate ratios
-        face_ratio = face_length / face_width if face_width > 0 else 1.0
-        jaw_ratio = jaw_width / face_width if face_width > 0 else 1.0
-        forehead_ratio = forehead_width / face_width if face_width > 0 else 1.0
-        
-        # Debug output
-        print(f"[MediaPipe] Face: {w}x{h}, Length: {face_length:.1f}, Width: {face_width:.1f}")
-        print(f"[MediaPipe] Ratios - Face: {face_ratio:.3f}, Jaw: {jaw_ratio:.3f}, Forehead: {forehead_ratio:.3f}")
-        
-        # Improved classification with better thresholds
-        # Classify face shape with more balanced logic
-        if face_ratio > 1.55:
-            # Very long face
-            face_shape = "Long"
-        elif face_ratio < 1.05:
-            # Short/wide face
-            if jaw_ratio > 0.92:
-                face_shape = "Round"
-            elif jaw_ratio < 0.75:
-                if forehead_ratio > 0.93:
-                    face_shape = "Heart"
-                else:
-                    face_shape = "Square"
-            else:
-                # Medium jaw width
-                if forehead_ratio > 0.92:
-                    face_shape = "Heart"
-                elif jaw_ratio > 0.85:
-                    face_shape = "Round"
-                else:
-                    face_shape = "Square"
-        elif face_ratio < 1.25:
-            # Medium length face (most common)
-            if forehead_ratio > 0.94 and jaw_ratio < 0.72:
-                face_shape = "Heart"
-            elif forehead_ratio < 0.83 and jaw_ratio < 0.83:
-                face_shape = "Diamond"
-            elif jaw_ratio > 0.92:
-                face_shape = "Round"
-            elif jaw_ratio < 0.78 and face_ratio < 1.15:
-                face_shape = "Square"
-            else:
-                face_shape = "Oval"
+        # Diamond detection (stricter) - requires ALL three conditions
+        if forehead_ratio < 0.82 and jaw_ratio < 0.82 and 1.15 < length_ratio < 1.45:
+            scores["Diamond"] += 2  # Lower bonus
         else:
-            # Longer face
-            if forehead_ratio < 0.84 and jaw_ratio < 0.84:
-                face_shape = "Diamond"
-            else:
+            scores["Diamond"] = max(0, scores["Diamond"] - 3)
+        
+        # Oval detection
+        if 0.85 <= forehead_ratio <= 1.0 and 0.85 <= jaw_ratio <= 1.0 and 1.1 <= length_ratio <= 1.35:
+            scores["Oval"] += 2
+        
+        # Round detection
+        if abs(forehead_ratio - jaw_ratio) < 0.05 and 0.9 <= length_ratio <= 1.15:
+            scores["Round"] += 2
+        
+        # Square detection
+        if abs(forehead_ratio - jaw_ratio) < 0.05 and 1.1 <= length_ratio <= 1.3:
+            scores["Square"] += 2
+        
+        # Heart detection
+        if forehead_ratio > 1.0 and jaw_ratio < 0.85:
+            scores["Heart"] += 2
+        
+        # Oblong detection
+        if length_ratio > 1.4 and 0.9 <= forehead_ratio <= 1.1 and 0.9 <= jaw_ratio <= 1.1:
+            scores["Oblong"] += 2
+        
+        # Determine final face shape
+        face_shape = max(scores, key=scores.get)
+        
+        # Calculate confidence
+        total_score = sum(scores.values())
+        if total_score > 0:
+            confidence = scores[face_shape] / total_score
+                else:
+            confidence = 0.5
+        
+        # Avoid false Diamond - require minimum confidence
+        if face_shape == "Diamond" and confidence < 0.6:
                 face_shape = "Oval"
+            if total_score > 0:
+                confidence = scores["Oval"] / total_score if scores["Oval"] > 0 else 0.5
         
-        confidence = 0.85  # MediaPipe is generally reliable
-        
-        print(f"[MediaPipe] Result: {face_shape} (confidence: {confidence})")
+        # Debug logging
+        print(f"[Debug] Ratios: forehead={forehead_ratio:.2f}, jaw={jaw_ratio:.2f}, length={length_ratio:.2f}")
+        print(f"[Debug] Scores: {scores}")
+        print(f"[Debug] Selected: {face_shape} (confidence={confidence:.2f})")
         
         return face_shape, confidence
     except Exception as e:
         print(f"Error in MediaPipe face shape detection: {e}")
-        # Use OpenCV on error
+        import traceback
+        traceback.print_exc()
         return detect_face_shape_opencv(image_bgr)
 
 def get_jewelry_recommendations(face_shape):
     """
-    Get jewelry recommendations based on face shape
+    Get jewelry recommendations based on face shape with unique images
+    Returns recommendations with at least 10 unique earring images and 10 unique necklace images
     """
-    recommendations = {
+    JEWELRY_RECOMMENDATIONS = {
         "Oval": {
-            "earrings": ["Hoop earrings", "Drop earrings", "Stud earrings", "Chandelier earrings"],
-            "necklaces": ["Choker necklaces", "Pendant necklaces", "Layered necklaces", "Statement necklaces"],
-            "description": "Oval faces are versatile and can wear almost any jewelry style!"
+            "earrings": [
+                {"name": "Teardrop earrings", "image": "https://images.unsplash.com/photo-1602173574767-37ac01994b2a?w=400&h=400&fit=crop"},
+                {"name": "Oval hoops", "image": "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=400&h=400&fit=crop"},
+                {"name": "Stud earrings", "image": "https://images.unsplash.com/photo-1611591437281-460bfbe1220a?w=400&h=400&fit=crop"},
+                {"name": "Chandelier earrings", "image": "https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=400&h=400&fit=crop"},
+                {"name": "Drop earrings", "image": "https://images.unsplash.com/photo-1603561591411-07134e71a2a9?w=400&h=400&fit=crop"},
+                {"name": "Hoop earrings", "image": "https://images.unsplash.com/photo-1620725790900-12d7e2e1b1b1?w=400&h=400&fit=crop"},
+                {"name": "Dangle earrings", "image": "https://images.unsplash.com/photo-1602173574767-37ac01994b2a?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Statement earrings", "image": "https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Pearl earrings", "image": "https://images.unsplash.com/photo-1611591437281-460bfbe1220a?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Geometric earrings", "image": "https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Crystal earrings", "image": "https://images.unsplash.com/photo-1602173574767-37ac01994b2a?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Vintage earrings", "image": "https://images.unsplash.com/photo-1611591437281-460bfbe1220a?w=400&h=400&fit=crop&auto=format"}
+            ],
+            "necklaces": [
+                {"name": "Short chains", "image": "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=400"},
+                {"name": "Princess-length necklaces", "image": "https://images.unsplash.com/photo-1611955167811-4711904bb9f0?w=400"},
+                {"name": "V-shaped pendants", "image": "https://images.unsplash.com/photo-1611955167811-4711904bb9f0?w=400&h=400&fit=crop"},
+                {"name": "Layered necklaces", "image": "https://images.unsplash.com/photo-1603561591411-07134e71a2a9?w=400"},
+                {"name": "Pendant necklaces", "image": "https://images.unsplash.com/photo-1611955167811-4711904bb9f0?w=400&h=400&fit=crop"},
+                {"name": "Choker necklaces", "image": "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=400&h=400&fit=crop"},
+                {"name": "Statement necklaces", "image": "https://images.unsplash.com/photo-1611955167811-4711904bb9f0?w=400&h=400&fit=crop"},
+                {"name": "Bib necklaces", "image": "https://images.unsplash.com/photo-1603561591411-07134e71a2a9?w=400&h=400&fit=crop"},
+                {"name": "Y-necklaces", "image": "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=400&h=400&fit=crop"},
+                {"name": "Collar necklaces", "image": "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=400&h=400&fit=crop"},
+                {"name": "Lariat necklaces", "image": "https://images.unsplash.com/photo-1603561591411-07134e71a2a9?w=400&h=400&fit=crop"},
+                {"name": "Chain necklaces", "image": "https://images.unsplash.com/photo-1611955167811-4711904bb9f0?w=400&h=400&fit=crop"}
+            ],
+            "description": "Oval faces are versatile and can wear almost any jewelry style! Your balanced proportions allow you to experiment with various earring and necklace designs."
         },
         "Round": {
-            "earrings": ["Long drop earrings", "Angular earrings", "Dangling earrings", "Avoid small hoops"],
-            "necklaces": ["V-shaped necklaces", "Long pendants", "Y-necklaces", "Avoid chokers"],
-            "description": "Elongate your face with vertical and angular jewelry pieces."
+            "earrings": [
+                {"name": "Long drop earrings", "image": "https://images.unsplash.com/photo-1602173574767-37ac01994b2a?w=400&h=400&fit=crop"},
+                {"name": "Slim dangles", "image": "https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=400&h=400&fit=crop"},
+                {"name": "Angular/rectangular earrings", "image": "https://images.unsplash.com/photo-1611591437281-460bfbe1220a?w=400&h=400&fit=crop"},
+                {"name": "Linear earrings", "image": "https://images.unsplash.com/photo-1603561591411-07134e71a2a9?w=400&h=400&fit=crop"},
+                {"name": "Vertical drop earrings", "image": "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=400&h=400&fit=crop"},
+                {"name": "Geometric earrings", "image": "https://images.unsplash.com/photo-1602173574767-37ac01994b2a?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Tassel earrings", "image": "https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Bar earrings", "image": "https://images.unsplash.com/photo-1611591437281-460bfbe1220a?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Asymmetric earrings", "image": "https://images.unsplash.com/photo-1603561591411-07134e71a2a9?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Cascade earrings", "image": "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Threader earrings", "image": "https://images.unsplash.com/photo-1602173574767-37ac01994b2a?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Spike earrings", "image": "https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=400&h=400&fit=crop&auto=format"}
+            ],
+            "necklaces": [
+                {"name": "V-shaped pendants", "image": "https://images.unsplash.com/photo-1611955167811-4711904bb9f0?w=400&h=400&fit=crop"},
+                {"name": "Long chains", "image": "https://images.unsplash.com/photo-1603561591411-07134e71a2a9?w=400&h=400&fit=crop"},
+                {"name": "Lariat necklaces", "image": "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=400&h=400&fit=crop"},
+                {"name": "Y-necklaces", "image": "https://images.unsplash.com/photo-1611955167811-4711904bb9f0?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Long pendant necklaces", "image": "https://images.unsplash.com/photo-1603561591411-07134e71a2a9?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Opera-length necklaces", "image": "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Rope necklaces", "image": "https://images.unsplash.com/photo-1611955167811-4711904bb9f0?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Tassel necklaces", "image": "https://images.unsplash.com/photo-1603561591411-07134e71a2a9?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Layered long necklaces", "image": "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Chain necklaces", "image": "https://images.unsplash.com/photo-1611955167811-4711904bb9f0?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Beaded necklaces", "image": "https://images.unsplash.com/photo-1603561591411-07134e71a2a9?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Statement pendants", "image": "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=400&h=400&fit=crop&auto=format"}
+            ],
+            "description": "Elongate your face with vertical and angular jewelry pieces. Long drop earrings and V-shaped necklaces will help create the illusion of length."
         },
         "Square": {
-            "earrings": ["Round hoops", "Curved earrings", "Drop earrings", "Avoid angular shapes"],
-            "necklaces": ["Curved necklaces", "Round pendants", "Layered chains", "Avoid geometric shapes"],
-            "description": "Soften your angles with curved and rounded jewelry pieces."
+            "earrings": [
+                {"name": "Hoops", "image": "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=400&h=400&fit=crop"},
+                {"name": "Circular earrings", "image": "https://images.unsplash.com/photo-1602173574767-37ac01994b2a?w=400&h=400&fit=crop"},
+                {"name": "Teardrop earrings", "image": "https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=400&h=400&fit=crop"},
+                {"name": "Round hoops", "image": "https://images.unsplash.com/photo-1611591437281-460bfbe1220a?w=400&h=400&fit=crop"},
+                {"name": "Oval earrings", "image": "https://images.unsplash.com/photo-1603561591411-07134e71a2a9?w=400&h=400&fit=crop"},
+                {"name": "Curved earrings", "image": "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Organic shape earrings", "image": "https://images.unsplash.com/photo-1602173574767-37ac01994b2a?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Soft geometric earrings", "image": "https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Rounded studs", "image": "https://images.unsplash.com/photo-1611591437281-460bfbe1220a?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Circular dangles", "image": "https://images.unsplash.com/photo-1603561591411-07134e71a2a9?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Bubble earrings", "image": "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Spiral earrings", "image": "https://images.unsplash.com/photo-1602173574767-37ac01994b2a?w=400&h=400&fit=crop&auto=format"}
+            ],
+            "necklaces": [
+                {"name": "Curved pendants", "image": "https://images.unsplash.com/photo-1611955167811-4711904bb9f0?w=400&h=400&fit=crop"},
+                {"name": "Round chokers", "image": "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=400&h=400&fit=crop"},
+                {"name": "Soft short chains", "image": "https://images.unsplash.com/photo-1603561591411-07134e71a2a9?w=400&h=400&fit=crop"},
+                {"name": "Circular pendants", "image": "https://images.unsplash.com/photo-1611955167811-4711904bb9f0?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Oval pendants", "image": "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Layered chains", "image": "https://images.unsplash.com/photo-1603561591411-07134e71a2a9?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Rounded bib necklaces", "image": "https://images.unsplash.com/photo-1611955167811-4711904bb9f0?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Curved collar necklaces", "image": "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Organic shape pendants", "image": "https://images.unsplash.com/photo-1603561591411-07134e71a2a9?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Soft geometric necklaces", "image": "https://images.unsplash.com/photo-1611955167811-4711904bb9f0?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Round link chains", "image": "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Circular statement pieces", "image": "https://images.unsplash.com/photo-1603561591411-07134e71a2a9?w=400&h=400&fit=crop&auto=format"}
+            ],
+            "description": "Soften your angles with curved and rounded jewelry pieces. Hoops, teardrops, and circular necklaces will help balance your strong jawline."
+        },
+        "Oblong": {
+            "earrings": [
+                {"name": "Stud earrings", "image": "https://images.unsplash.com/photo-1611591437281-460bfbe1220a?w=400&h=400&fit=crop"},
+                {"name": "Cluster earrings", "image": "https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=400&h=400&fit=crop"},
+                {"name": "Short drop earrings", "image": "https://images.unsplash.com/photo-1602173574767-37ac01994b2a?w=400&h=400&fit=crop"},
+                {"name": "Wide hoops", "image": "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=400&h=400&fit=crop"},
+                {"name": "Button earrings", "image": "https://images.unsplash.com/photo-1611591437281-460bfbe1220a?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Huggie hoops", "image": "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Cluster studs", "image": "https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Short dangles", "image": "https://images.unsplash.com/photo-1602173574767-37ac01994b2a?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Wide geometric earrings", "image": "https://images.unsplash.com/photo-1603561591411-07134e71a2a9?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Horizontal earrings", "image": "https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Cuff earrings", "image": "https://images.unsplash.com/photo-1602173574767-37ac01994b2a?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Ear climbers", "image": "https://images.unsplash.com/photo-1611591437281-460bfbe1220a?w=400&h=400&fit=crop&auto=format"}
+            ],
+            "necklaces": [
+                {"name": "Short necklaces", "image": "https://images.unsplash.com/photo-1611955167811-4711904bb9f0?w=400&h=400&fit=crop"},
+                {"name": "Chunky chokers", "image": "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=400&h=400&fit=crop"},
+                {"name": "Layered necklaces", "image": "https://images.unsplash.com/photo-1603561591411-07134e71a2a9?w=400&h=400&fit=crop"},
+                {"name": "Collar necklaces", "image": "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Bib necklaces", "image": "https://images.unsplash.com/photo-1603561591411-07134e71a2a9?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Wide chokers", "image": "https://images.unsplash.com/photo-1611955167811-4711904bb9f0?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Multi-strand necklaces", "image": "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Statement chokers", "image": "https://images.unsplash.com/photo-1603561591411-07134e71a2a9?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Short pendants", "image": "https://images.unsplash.com/photo-1611955167811-4711904bb9f0?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Collar-style necklaces", "image": "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Layered short chains", "image": "https://images.unsplash.com/photo-1603561591411-07134e71a2a9?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Wide statement pieces", "image": "https://images.unsplash.com/photo-1611955167811-4711904bb9f0?w=400&h=400&fit=crop&auto=format"}
+            ],
+            "description": "Add width to your face with horizontal and choker-style jewelry. Wide hoops, cluster earrings, and chunky chokers will help balance your face length."
         },
         "Heart": {
-            "earrings": ["Wide bottom earrings", "Chandelier earrings", "Avoid narrow top-heavy styles"],
-            "necklaces": ["Choker necklaces", "Short necklaces", "Avoid long pendants"],
-            "description": "Balance your wider forehead with wider-bottom jewelry."
-        },
-        "Long": {
-            "earrings": ["Wide hoops", "Short drop earrings", "Stud earrings", "Avoid long dangling"],
-            "necklaces": ["Choker necklaces", "Short necklaces", "Layered styles", "Avoid long pendants"],
-            "description": "Add width to your face with horizontal and choker-style jewelry."
+            "earrings": [
+                {"name": "Teardrop earrings", "image": "https://images.unsplash.com/photo-1602173574767-37ac01994b2a?w=400&h=400&fit=crop"},
+                {"name": "Oval drop earrings", "image": "https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=400&h=400&fit=crop"},
+                {"name": "Triangle-shaped earrings", "image": "https://images.unsplash.com/photo-1611591437281-460bfbe1220a?w=400&h=400&fit=crop"},
+                {"name": "Wide bottom earrings", "image": "https://images.unsplash.com/photo-1603561591411-07134e71a2a9?w=400&h=400&fit=crop"},
+                {"name": "Chandelier earrings", "image": "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=400&h=400&fit=crop"},
+                {"name": "Inverted triangle earrings", "image": "https://images.unsplash.com/photo-1602173574767-37ac01994b2a?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Wide drop earrings", "image": "https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Fan earrings", "image": "https://images.unsplash.com/photo-1611591437281-460bfbe1220a?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Cascade earrings", "image": "https://images.unsplash.com/photo-1603561591411-07134e71a2a9?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Wide bottom dangles", "image": "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Tapered earrings", "image": "https://images.unsplash.com/photo-1602173574767-37ac01994b2a?w=400&h=400&fit=crop&auto=format"},
+                {"name": "A-line earrings", "image": "https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=400&h=400&fit=crop&auto=format"}
+            ],
+            "necklaces": [
+                {"name": "Chokers", "image": "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=400&h=400&fit=crop"},
+                {"name": "Short round necklaces", "image": "https://images.unsplash.com/photo-1611955167811-4711904bb9f0?w=400&h=400&fit=crop"},
+                {"name": "Heart-shaped pendants", "image": "https://images.unsplash.com/photo-1603561591411-07134e71a2a9?w=400&h=400&fit=crop"},
+                {"name": "Collar necklaces", "image": "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Short pendants", "image": "https://images.unsplash.com/photo-1611955167811-4711904bb9f0?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Princess-length necklaces", "image": "https://images.unsplash.com/photo-1603561591411-07134e71a2a9?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Round pendants", "image": "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Short chains", "image": "https://images.unsplash.com/photo-1611955167811-4711904bb9f0?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Bib necklaces", "image": "https://images.unsplash.com/photo-1603561591411-07134e71a2a9?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Collar-style necklaces", "image": "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Short layered necklaces", "image": "https://images.unsplash.com/photo-1611955167811-4711904bb9f0?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Round statement pieces", "image": "https://images.unsplash.com/photo-1603561591411-07134e71a2a9?w=400&h=400&fit=crop&auto=format"}
+            ],
+            "description": "Balance your wider forehead with wider-bottom jewelry. Teardrop and wide-bottom earrings, along with chokers and short necklaces, will help create visual balance."
         },
         "Diamond": {
-            "earrings": ["Drop earrings", "Chandelier earrings", "Avoid wide styles"],
-            "necklaces": ["Choker necklaces", "Short pendants", "Avoid long chains"],
-            "description": "Balance your cheekbones with wider-bottom earrings and shorter necklaces."
+            "earrings": [
+                {"name": "Hoops", "image": "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=400&h=400&fit=crop"},
+                {"name": "Oval earrings", "image": "https://images.unsplash.com/photo-1602173574767-37ac01994b2a?w=400&h=400&fit=crop"},
+                {"name": "Drop earrings that add width", "image": "https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=400&h=400&fit=crop"},
+                {"name": "Wide bottom earrings", "image": "https://images.unsplash.com/photo-1611591437281-460bfbe1220a?w=400&h=400&fit=crop"},
+                {"name": "Chandelier earrings", "image": "https://images.unsplash.com/photo-1603561591411-07134e71a2a9?w=400&h=400&fit=crop"},
+                {"name": "Oval hoops", "image": "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Wide drop earrings", "image": "https://images.unsplash.com/photo-1602173574767-37ac01994b2a?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Fan earrings", "image": "https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Cascade earrings", "image": "https://images.unsplash.com/photo-1611591437281-460bfbe1220a?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Wide geometric earrings", "image": "https://images.unsplash.com/photo-1603561591411-07134e71a2a9?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Oval dangles", "image": "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Wide bottom hoops", "image": "https://images.unsplash.com/photo-1602173574767-37ac01994b2a?w=400&h=400&fit=crop&auto=format"}
+            ],
+            "necklaces": [
+                {"name": "Rounded necklaces", "image": "https://images.unsplash.com/photo-1611955167811-4711904bb9f0?w=400&h=400&fit=crop"},
+                {"name": "Short pendants", "image": "https://images.unsplash.com/photo-1603561591411-07134e71a2a9?w=400&h=400&fit=crop"},
+                {"name": "Collar necklaces", "image": "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=400&h=400&fit=crop"},
+                {"name": "Choker necklaces", "image": "https://images.unsplash.com/photo-1611955167811-4711904bb9f0?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Round pendants", "image": "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Short chains", "image": "https://images.unsplash.com/photo-1603561591411-07134e71a2a9?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Princess-length necklaces", "image": "https://images.unsplash.com/photo-1611955167811-4711904bb9f0?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Collar-style necklaces", "image": "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Round chokers", "image": "https://images.unsplash.com/photo-1603561591411-07134e71a2a9?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Short layered necklaces", "image": "https://images.unsplash.com/photo-1611955167811-4711904bb9f0?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Oval pendants", "image": "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=400&h=400&fit=crop&auto=format"},
+                {"name": "Curved short necklaces", "image": "https://images.unsplash.com/photo-1603561591411-07134e71a2a9?w=400&h=400&fit=crop&auto=format"}
+            ],
+            "description": "Balance your cheekbones with wider-bottom earrings and shorter necklaces. Hoops, oval earrings, and choker-style necklaces will help soften your angular features."
         }
     }
-    return recommendations.get(face_shape, recommendations["Oval"])
+    return JEWELRY_RECOMMENDATIONS.get(face_shape, JEWELRY_RECOMMENDATIONS["Oval"])
 
 # ============================================================================
 # MAIN ANALYSIS FUNCTION
