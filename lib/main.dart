@@ -1,6 +1,5 @@
 // lib/main.dart
 // USER APP ENTRY POINT - For Android/Mobile builds
-// DO NOT import admin screens here - admin code is in admin_main.dart
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 
@@ -27,6 +26,7 @@ import 'screens/profile_screen.dart';
 import 'screens/style_profile_screen.dart';
 import 'screens/privacy_policy_screen.dart';
 import 'screens/terms_of_service_screen.dart';
+import 'screens/face_shape_screen.dart';
 import 'utils/app_info.dart';
 
 Future<void> main() async {
@@ -70,6 +70,7 @@ class MyApp extends StatelessWidget {
         '/style-profile': (_) => const StyleProfileScreen(),
         '/privacy': (_) => const PrivacyPolicyScreen(),
         '/terms': (_) => const TermsOfServiceScreen(),
+        FaceShapeScreen.route: (_) => const FaceShapeScreen(),
       },
     );
   }

@@ -55,10 +55,13 @@ class _FitCheckAnalyzingScreenState extends State<FitCheckAnalyzingScreen>
       // Compress image before uploading to reduce file size
       final compressedPath = await ImageCompressor.compressImage(widget.imagePath);
       
+      // Use compressed path if available, otherwise use original
+      final imagePathToAnalyze = compressedPath ?? widget.imagePath;
+      
       // Analyze the ACTUAL image uploaded by the user
       // This will detect colors, proportions, and style from the photo
       print('🔍 Starting analysis of user\'s outfit image...');
-      final result = await FitCheckAnalysisService.analyzeOutfit(compressedPath);
+      final result = await FitCheckAnalysisService.analyzeOutfit(imagePathToAnalyze);
       print('✅ Analysis complete! Results received.');
 
       // Stop animation

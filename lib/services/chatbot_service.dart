@@ -3,8 +3,11 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 class ChatbotService {
-  // Use your Railway URL - update this when deploying
-  static const String baseUrl = 'https://amiable-encouragement-production.up.railway.app';
+  // Local testing - use your computer's IP address for phone testing
+  // For web/emulator: use 'http://localhost:5000'
+  // For phone: use 'http://YOUR_IP:5000' (e.g., 'http://172.20.2.27:5000')
+  static const String baseUrl = 'http://172.20.2.27:5000'; // Change to localhost or your IP
+  // Production: 'https://amiable-encouragement-production.up.railway.app';
   
   /// Get chatbot response
   Future<String> getResponse(String userMessage, {String? context}) async {

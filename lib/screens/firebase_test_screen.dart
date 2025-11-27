@@ -145,7 +145,7 @@ class _FirebaseTestScreenState extends State<FirebaseTestScreen> {
 
     try {
       final storage = FirebaseStorage.instance;
-      final ref = storage.ref();
+      // final ref = storage.ref(); // Unused variable removed
       
       await _updateTest(
         'Firebase Storage',

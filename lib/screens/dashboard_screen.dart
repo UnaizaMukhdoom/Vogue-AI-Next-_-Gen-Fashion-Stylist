@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/skin_analysis_service.dart';
+import 'ai_stylist_screen.dart';
 import 'result_screen.dart';
+import 'face_shape_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -222,14 +224,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     
                     const SizedBox(height: 12),
                     
+                    // Face Shape Analysis Card
+                    _FaceShapeCard(
+                      onTap: () {
+                        Navigator.pushNamed(context, FaceShapeScreen.route);
+                      },
+                    ),
+                    
+                    const SizedBox(height: 12),
+                    
                     // AI Stylist and Fit Check Cards (Side by Side)
                     Row(
                       children: [
                         Expanded(
                           child: _AIStylistCard(
                             onTap: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('AI Stylist coming soon!')),
+                              Navigator.pushNamed(
+                                context,
+                                AIStylistScreen.route,
                               );
                             },
                           ),
@@ -247,11 +259,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     
                     const SizedBox(height: 20),
                     
-                    // Complete Your Style Profile Banner
-                    _StyleProfileBanner(),
-                    
-                    const SizedBox(height: 20),
-                    
                     // Checked Items Section
                     const Text(
                       'Checked items',
@@ -266,45 +273,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       onScan: () {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Scan feature coming soon!')),
-                        );
-                      },
-                    ),
-                    
-                    const SizedBox(height: 24),
-                    
-                    // Personal Stylist Section
-                    const Text(
-                      'Personal stylist',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    _PersonalStylistCard(
-                      question: 'What are the current fashion trends?',
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('AI Stylist feature coming soon!')),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    _PersonalStylistCard(
-                      question: 'What can I add to a basic tee and jeans to dress it up?',
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('AI Stylist feature coming soon!')),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    _PersonalStylistCard(
-                      question: 'What accessories well with this outfit?',
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('AI Stylist feature coming soon!')),
                         );
                       },
                     ),
@@ -586,6 +554,93 @@ class _ColorAnalysisCard extends StatelessWidget {
   }
 }
 
+// Face Shape Card - Purple Gradient Card
+class _FaceShapeCard extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _FaceShapeCard({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF9B7EDE), Color(0xFFB8A5E8)],
+        ),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      padding: const EdgeInsets.all(20),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Face Shape',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Discover jewelry that\ncomplements your face',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 14,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: onTap,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24),
+                      side: const BorderSide(color: Colors.black, width: 1),
+                    ),
+                  ),
+                  child: const Text(
+                    'Analyze Now',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          // Face icon with jewelry
+          Container(
+            width: 100,
+            height: 100,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              shape: BoxShape.circle,
+            ),
+            child: const Center(
+              child: Icon(
+                Icons.face,
+                color: Colors.white,
+                size: 50,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // AI Stylist Card - Purple with Clothing Items
 class _AIStylistCard extends StatelessWidget {
   final VoidCallback onTap;
@@ -625,8 +680,8 @@ class _AIStylistCard extends StatelessWidget {
                   const Spacer(),
                   // Clothing items placeholder
                   Container(
-                    width: 60,
-                    height: 60,
+                    width: 56,
+                    height: 56,
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(8),
@@ -635,7 +690,7 @@ class _AIStylistCard extends StatelessWidget {
                       child: Icon(
                         Icons.checkroom,
                         color: Colors.white,
-                        size: 30,
+                        size: 28,
                       ),
                     ),
                   ),
@@ -686,44 +741,47 @@ class _FitCheckCard extends StatelessWidget {
                     ),
                   ),
                   const Spacer(),
-                  // Photo placeholder with badge
-                  Stack(
-                    children: [
-                      Container(
-                        width: 50,
-                        height: 50,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Center(
-                          child: Icon(
-                            Icons.person,
-                            color: Colors.black,
-                            size: 30,
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        top: -4,
-                        right: -4,
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
+                  // Photo placeholder with badge (clipped to avoid overflow)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Stack(
+                      clipBehavior: Clip.hardEdge,
+                      children: [
+                        Container(
+                          width: 50,
+                          height: 50,
                           decoration: const BoxDecoration(
-                            color: Colors.blue,
-                            shape: BoxShape.circle,
+                            color: Colors.white,
                           ),
-                          child: const Text(
-                            'A+',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 8,
-                              fontWeight: FontWeight.bold,
+                          child: const Center(
+                            child: Icon(
+                              Icons.person,
+                              color: Colors.black,
+                              size: 28,
                             ),
                           ),
                         ),
-                      ),
-                    ],
+                        Positioned(
+                          top: 0,
+                          right: 0,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(
+                              color: Colors.blue,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Text(
+                              'A+',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 8,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -827,7 +885,9 @@ class _CheckedItemCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
-                Row(
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
                   children: [
                     ElevatedButton.icon(
                       onPressed: onScan,
@@ -842,7 +902,6 @@ class _CheckedItemCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(

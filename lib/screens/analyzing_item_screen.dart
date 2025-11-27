@@ -2,7 +2,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'item_result_screen.dart';
-import '../services/skin_analysis_service.dart';
+import '../services/item_analysis_service.dart';
 
 /// Analyzing Item Screen - Shows scanning animation with green line
 class AnalyzingItemScreen extends StatefulWidget {
@@ -39,35 +39,55 @@ class _AnalyzingItemScreenState extends State<AnalyzingItemScreen>
     // Start scanning animation
     _scanController.repeat();
 
-    // Simulate analysis (replace with actual API call)
-    await Future.delayed(const Duration(seconds: 3));
+    try {
+      // Analyze the item using the API
+      final result = await ItemAnalysisService.analyzeItem(widget.imagePath);
+      
+      // Stop animation
+      _scanController.stop();
+      _scanController.reset();
 
-    // Stop animation
-    _scanController.stop();
-    _scanController.reset();
+      if (!mounted) return;
 
-    if (!mounted) return;
-
-    // Navigate to result screen
-    // For now, using mock data - replace with actual analysis result
-    final mockResult = {
-      'suitability': 72,
-      'color': 75,
-      'shape': 70,
-      'fit': 70,
-      'title': 'Embroidered Kurti Set',
-      'type': 'Full-body',
-    };
-
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ItemResultScreen(
-          imagePath: widget.imagePath,
-          result: mockResult,
+      // Navigate to result screen with actual analysis result
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ItemResultScreen(
+            imagePath: widget.imagePath,
+            result: result,
+          ),
         ),
-      ),
-    );
+      );
+    } catch (e) {
+      // Stop animation
+      _scanController.stop();
+      _scanController.reset();
+
+      if (!mounted) return;
+
+      // Show error and use fallback result
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Analysis error: $e. Using estimated results.'),
+          backgroundColor: Colors.orange,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+
+      // Use fallback result with varied scores
+      final fallbackResult = ItemAnalysisService.getFallbackResult();
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ItemResultScreen(
+            imagePath: widget.imagePath,
+            result: fallbackResult,
+          ),
+        ),
+      );
+    }
   }
 
   @override

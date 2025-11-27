@@ -2,6 +2,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'check_item_camera_screen.dart';
+import '../services/closet_service.dart';
 
 /// Item Result Screen - Shows analysis result with rating and scores
 class ItemResultScreen extends StatefulWidget {
@@ -279,10 +280,53 @@ class _ItemResultScreenState extends State<ItemResultScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Saved to closet!')),
-                        );
+                      onPressed: () async {
+                        try {
+                          // Show loading
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Saving to closet...'),
+                              duration: Duration(seconds: 1),
+                            ),
+                          );
+
+                          // Save to closet
+                          await ClosetService.saveItemToCloset(
+                            imagePath: widget.imagePath,
+                            title: title,
+                            type: type,
+                            suitability: suitability,
+                            colorScore: colorScore,
+                            shapeScore: shapeScore,
+                            fitScore: fitScore,
+                            additionalData: widget.result,
+                          );
+
+                          // Show success
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('✅ Saved to closet!'),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                            // Navigate back after a short delay
+                            Future.delayed(const Duration(seconds: 1), () {
+                              if (mounted) {
+                                Navigator.pop(context);
+                              }
+                            });
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Error saving: $e'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        }
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.white,

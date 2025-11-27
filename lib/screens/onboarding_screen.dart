@@ -38,17 +38,41 @@ class OnboardingScreen extends StatelessWidget {
                   flex: 3,
                   child: Center(
                     child: Container(
-                      width: 300,
-                      height: 300,
+                      width: 250,
+                      height: 150,
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      child: Center(
-                        child: Icon(
-                          Icons.analytics,
-                          size: 150,
-                          color: Colors.white.withOpacity(0.8),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: Image.network(
+                          'https://t4.ftcdn.net/jpg/04/06/91/91/240_F_406919161_J0pGxe1sewqnk5dnvyRS77MKmEd6SVac.jpg',
+                          width: 250,
+                          height: 150,
+                          fit: BoxFit.contain, // Changed from cover to contain to show full logo
+                          errorBuilder: (context, error, stackTrace) {
+                            // Fallback to icon if image fails to load
+                            return Center(
+                              child: Icon(
+                                Icons.analytics,
+                                size: 150,
+                                color: Colors.white.withOpacity(0.8),
+                              ),
+                            );
+                          },
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return Center(
+                              child: CircularProgressIndicator(
+                                value: loadingProgress.expectedTotalBytes != null
+                                    ? loadingProgress.cumulativeBytesLoaded /
+                                        loadingProgress.expectedTotalBytes!
+                                    : null,
+                                color: Colors.white,
+                              ),
+                            );
+                          },
                         ),
                       ),
                     ),
@@ -60,7 +84,7 @@ class OnboardingScreen extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        'Get Detailed Analytics',
+                        'Your Personal Fashion Stylist',
                         style: TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.bold,
@@ -70,9 +94,9 @@ class OnboardingScreen extends StatelessWidget {
                       ),
                       SizedBox(height: 16),
                       Text(
-                        'Complete the quiz to get a detailed report\n'
-                            'of your performance and challenge\n'
-                            'yourself to achieve more.',
+                        'Discover your perfect colors, get AI-powered\n'
+                            'style recommendations, and build a wardrobe\n'
+                            'that truly reflects your unique style.',
                         style: TextStyle(fontSize: 16, color: Colors.black54, height: 1.5),
                         textAlign: TextAlign.center,
                       ),

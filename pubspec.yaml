@@ -57,6 +57,10 @@ dependencies:
   pull_to_refresh: ^2.0.0
   path_provider: ^2.1.1
   path: ^1.8.3
+  
+  # WebView for embedding web content
+  webview_flutter: ^4.4.2
+
 
 dev_dependencies:
   flutter_test:

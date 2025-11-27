@@ -1,6 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'ai_stylist_screen.dart';
 import 'closet_screen.dart';
+import '../services/closet_service.dart';
 
 
 class HomeScreen extends StatelessWidget {
@@ -54,6 +56,16 @@ class HomeScreen extends StatelessWidget {
           ),
           const SizedBox(height: 12),
 
+          // Face Shape Analysis card
+          _BigCard(
+            gradient: const [Color(0xFF9B7EDE), Color(0xFFB8A5E8)],
+            title: "Face Shape",
+            subtitle: "Discover jewelry that\ncomplements your face",
+            ctaText: "Analyze Now",
+            onTap: () => Navigator.pushNamed(context, '/face-shape'),
+          ),
+          const SizedBox(height: 12),
+
           // AI Stylist + Fit Check (→ Step 7, 8)
           Row(
             children: [
@@ -82,11 +94,93 @@ class HomeScreen extends StatelessWidget {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
           const SizedBox(height: 10),
 
-          // Closet / Checked Items (→ Step 9)
-          _CheckedItemCard(
-            title: "Check if item suit you,\nstyle it and find similar.",
-            badge: "100% suits you",
-            onScan: () => Navigator.pushNamed(context, ClosetScreen.route),
+          // Closet / Checked Items (→ Step 9) - Now shows actual items
+          StreamBuilder<List<ClosetItem>>(
+            stream: ClosetService.getRecentCheckedItems(limit: 3),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const _CheckedItemCard(
+                  title: "Check if item suit you,\nstyle it and find similar.",
+                  badge: "Loading...",
+                  onScan: null,
+                );
+              }
+
+              final items = snapshot.data ?? [];
+              
+              if (items.isEmpty) {
+                return _CheckedItemCard(
+                  title: "Check if item suit you,\nstyle it and find similar.",
+                  badge: "No items yet",
+                  onScan: () => Navigator.pushNamed(context, ClosetScreen.route),
+                );
+              }
+
+              // Show recent checked items
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Show items in a horizontal scrollable list
+                  SizedBox(
+                    height: 140,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: items.length,
+                      itemBuilder: (context, index) {
+                        final item = items[index];
+                        return Container(
+                          width: 120,
+                          margin: EdgeInsets.only(
+                            right: index < items.length - 1 ? 12 : 0,
+                          ),
+                          child: _CheckedItemMiniCard(
+                            item: item,
+                            onTap: () => Navigator.pushNamed(context, ClosetScreen.route),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  // Show "View All" button if there are items
+                  if (items.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: GestureDetector(
+                        onTap: () => Navigator.pushNamed(context, ClosetScreen.route),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              '${items.length} checked item${items.length > 1 ? 's' : ''}',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.7),
+                                fontSize: 14,
+                              ),
+                            ),
+                            Row(
+                              children: [
+                                Text(
+                                  'View all',
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.7),
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Icon(
+                                  Icons.arrow_forward_ios,
+                                  size: 12,
+                                  color: Colors.white.withOpacity(0.7),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
           ),
 
           const SizedBox(height: 24),
@@ -226,12 +320,14 @@ class _SmallCard extends StatelessWidget {
 class _CheckedItemCard extends StatelessWidget {
   final String title;
   final String badge;
-  final VoidCallback onScan;
+  final VoidCallback? onScan;
+  final String? imagePath;
 
   const _CheckedItemCard({
     required this.title,
     required this.badge,
-    required this.onScan,
+    this.onScan,
+    this.imagePath,
   });
 
   @override
@@ -270,6 +366,22 @@ class _CheckedItemCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
+          if (imagePath != null && imagePath!.isNotEmpty && File(imagePath!).existsSync())
+            Container(
+              height: 120,
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                color: const Color(0xFF1E1F22),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.file(
+                  File(imagePath!),
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ),
           OutlinedButton.icon(
             onPressed: onScan,
             icon: const Icon(Icons.qr_code_scanner),
@@ -280,6 +392,122 @@ class _CheckedItemCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Mini card for displaying checked items in horizontal list
+class _CheckedItemMiniCard extends StatelessWidget {
+  final ClosetItem item;
+  final VoidCallback onTap;
+
+  const _CheckedItemMiniCard({
+    required this.item,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    Color badgeColor;
+    if (item.suitability >= 90) {
+      badgeColor = Colors.green.shade400;
+    } else if (item.suitability >= 70) {
+      badgeColor = Colors.green.shade300;
+    } else if (item.suitability >= 50) {
+      badgeColor = Colors.orange.shade300;
+    } else {
+      badgeColor = Colors.redAccent.shade100;
+    }
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF2A2C31),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Image
+            Expanded(
+              child: Container(
+                width: double.infinity,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF1E1F22),
+                  borderRadius: BorderRadius.vertical(
+                    top: Radius.circular(12),
+                  ),
+                ),
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(12),
+                  ),
+                  child: item.imagePath.isNotEmpty && File(item.imagePath).existsSync()
+                      ? Image.file(
+                          File(item.imagePath),
+                          fit: BoxFit.cover,
+                        )
+                      : item.imageUrl.isNotEmpty
+                          ? Image.network(
+                              item.imageUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return const Center(
+                                  child: Icon(
+                                    Icons.checkroom_outlined,
+                                    color: Colors.white54,
+                                  ),
+                                );
+                              },
+                            )
+                          : const Center(
+                              child: Icon(
+                                Icons.checkroom_outlined,
+                                color: Colors.white54,
+                              ),
+                            ),
+                ),
+              ),
+            ),
+            // Title and badge
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: badgeColor,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      item.suitabilityText,
+                      style: const TextStyle(
+                        color: Colors.black,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
